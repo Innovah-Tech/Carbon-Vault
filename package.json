@@ -8,6 +8,9 @@
     "test": "hardhat test",
     "deploy:mantle": "hardhat run scripts/deploy.js --network mantle",
     "deploy:mantle-testnet": "hardhat run scripts/deploy.js --network mantleTestnet",
+    "deploy:cvt-system": "hardhat run scripts/deploy-cvt-system.js",
+    "deploy:cvt-system:mantle": "hardhat run scripts/deploy-cvt-system.js --network mantle",
+    "deploy:cvt-system:mantle-testnet": "hardhat run scripts/deploy-cvt-system.js --network mantleTestnet",
     "node": "hardhat node",
     "lint": "eslint .",
     "format": "prettier --write ."
