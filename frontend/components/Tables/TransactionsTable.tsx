@@ -3,7 +3,7 @@
 import { ArrowUpRight, ArrowDownLeft, Coins, Clock, CheckCircle, XCircle } from 'lucide-react'
 import clsx from 'clsx'
 
-interface Transaction {
+export interface Transaction {
   id: number
   type: 'purchase' | 'sale' | 'stake' | 'unstake' | 'reward' | 'mint'
   amount: number

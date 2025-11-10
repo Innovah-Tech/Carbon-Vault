@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/Layout/MainLayout'
 import { HoldingsCard } from '@/components/Cards/HoldingsCard'
 import { YieldCard } from '@/components/Cards/YieldCard'
 import { ComplianceCard } from '@/components/Cards/ComplianceCard'
-import { TransactionsTable } from '@/components/Tables/TransactionsTable'
+import { TransactionsTable, type Transaction } from '@/components/Tables/TransactionsTable'
 import { useAccount } from 'wagmi'
 
 // Mock data - replace with actual data from contracts
@@ -20,7 +20,7 @@ const mockYield = {
   pendingRewards: 125,
 }
 
-const mockTransactions = [
+const mockTransactions: Transaction[] = [
   {
     id: 1,
     type: 'purchase',
