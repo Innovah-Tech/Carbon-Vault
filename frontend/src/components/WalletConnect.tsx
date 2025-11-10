@@ -22,7 +22,20 @@ export function WalletConnect() {
 
   const connectWallet = async () => {
     try {
-      const metaMaskConnector = connectors.find((c) => c.id === "injected");
+      // Check if MetaMask is installed
+      if (typeof window.ethereum === 'undefined') {
+        toast({
+          title: "MetaMask Not Found",
+          description: "Please install MetaMask extension from metamask.io",
+          variant: "destructive",
+        });
+        window.open('https://metamask.io/download/', '_blank');
+        return;
+      }
+
+      // Find the injected connector (MetaMask)
+      const metaMaskConnector = connectors.find((c) => c.id === "injected" || c.name === "MetaMask");
+      
       if (metaMaskConnector) {
         connect({ connector: metaMaskConnector });
         toast({
@@ -30,11 +43,20 @@ export function WalletConnect() {
           description: "Please approve the connection in MetaMask",
         });
       } else {
-        toast({
-          title: "MetaMask Not Found",
-          description: "Please install MetaMask extension",
-          variant: "destructive",
-        });
+        // Fallback: try to connect with the first available connector
+        if (connectors.length > 0) {
+          connect({ connector: connectors[0] });
+          toast({
+            title: "Connecting...",
+            description: "Please approve the connection in your wallet",
+          });
+        } else {
+          toast({
+            title: "No Wallet Found",
+            description: "Please refresh the page and try again",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
       toast({

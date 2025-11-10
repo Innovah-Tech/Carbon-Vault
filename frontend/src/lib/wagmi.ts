@@ -2,6 +2,9 @@ import { createConfig, http } from 'wagmi'
 import { mantleSepoliaTestnet } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
+// Alchemy API key for enhanced RPC
+const ALCHEMY_API_KEY = 'ZUEe32o7aGcGrnalTBdzF'
+
 // Define Mantle Sepolia Testnet
 export const mantleSepolia = {
   id: 5003,
@@ -19,6 +22,9 @@ export const mantleSepolia = {
     public: {
       http: ['https://rpc.sepolia.mantle.xyz'],
     },
+    alchemy: {
+      http: [`https://mantle-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`],
+    },
   },
   blockExplorers: {
     default: { 
@@ -29,17 +35,16 @@ export const mantleSepolia = {
   testnet: true,
 } as const
 
-// Create wagmi config
+// Create wagmi config with Alchemy RPC for better performance
 export const config = createConfig({
   chains: [mantleSepolia],
   connectors: [
-    injected({ 
-      target: 'metaMask',
+    injected({
       shimDisconnect: true,
     }),
   ],
   transports: {
-    [mantleSepolia.id]: http(),
+    [mantleSepolia.id]: http(`https://mantle-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`),
   },
 })
 
