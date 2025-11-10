@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -44,12 +44,10 @@ contract ValidatorRewards is ReentrancyGuard, Ownable {
     /**
      * @dev Constructor
      * @param _cvt Address of CVT token contract
-     * @param initialOwner Address of the contract owner
      */
     constructor(
-        address _cvt,
-        address initialOwner
-    ) Ownable(initialOwner) {
+        address _cvt
+    ) Ownable(msg.sender) {
         require(_cvt != address(0), "Invalid CVT address");
         cvtToken = IERC20(_cvt);
         rewardPerProof = 1e18; // 1 CVT per proof by default

@@ -1,32 +1,30 @@
 # Data Pipeline Dependencies
 
 # HTTP Requests
-requests==2.31.0
-aiohttp==3.9.1
-httpx==0.25.2
+requests>=2.31.0
+aiohttp>=3.9.1
+httpx>=0.25.2
 
-# Data Processing
-pandas==2.1.4
-numpy==1.26.2
+# Data Processing (Python 3.13 compatible)
+pandas>=2.2.0
+numpy>=1.26.0
 
 # Database
-sqlalchemy==2.0.23
+sqlalchemy>=2.0.23
+psycopg2-binary>=2.9.9
 
 # Environment Variables
-python-dotenv==1.0.0
+python-dotenv>=1.0.0
 
 # Date/Time
-python-dateutil==2.8.2
+python-dateutil>=2.8.2
 
 # Logging
-loguru==0.7.2
+loguru>=0.7.2
 
 # Retry Logic
-tenacity==8.2.3
+tenacity>=8.2.3
 
 # Data Validation
-pydantic==2.5.2
-
-# Async Support
-asyncio==3.4.3
+pydantic>=2.5.2
 

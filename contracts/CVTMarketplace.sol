@@ -2,9 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
  * @title CVTMarketplace
@@ -12,8 +11,6 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * Supports listing, buying, and can be extended with escrow, fees, or auctions
  */
 contract CVTMarketplace is ReentrancyGuard, Ownable {
-    using Counters for Counters.Counter;
-    
     struct Listing {
         address seller;
         uint256 amount;
@@ -26,7 +23,7 @@ contract CVTMarketplace is ReentrancyGuard, Ownable {
     IERC20 public cvtToken;
     IERC20 public stablecoin;
     
-    Counters.Counter private _listingCounter;
+    uint256 private _listingCounter;
     mapping(uint256 => Listing) public listings;
     
     // Marketplace fee (in basis points, e.g., 250 = 2.5%)
@@ -58,22 +55,19 @@ contract CVTMarketplace is ReentrancyGuard, Ownable {
      * @dev Constructor
      * @param _cvt Address of CVT token contract
      * @param _stable Address of stablecoin contract
-     * @param _feeRecipient Address to receive marketplace fees
      * @param initialOwner Address of the contract owner
      */
     constructor(
         address _cvt,
         address _stable,
-        address _feeRecipient,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_cvt != address(0), "Invalid CVT address");
         require(_stable != address(0), "Invalid stablecoin address");
-        require(_feeRecipient != address(0), "Invalid fee recipient");
         
         cvtToken = IERC20(_cvt);
         stablecoin = IERC20(_stable);
-        feeRecipient = _feeRecipient;
+        feeRecipient = initialOwner; // Set owner as initial fee recipient
         marketplaceFeeBps = 250; // 2.5% default fee
     }
     
@@ -98,8 +92,8 @@ contract CVTMarketplace is ReentrancyGuard, Ownable {
             "Transfer failed"
         );
         
-        _listingCounter.increment();
-        uint256 listingId = _listingCounter.current();
+        _listingCounter++;
+        uint256 listingId = _listingCounter;
         
         uint256 expiresAt = expiresIn > 0 ? block.timestamp + expiresIn : 0;
         
@@ -198,7 +192,7 @@ contract CVTMarketplace is ReentrancyGuard, Ownable {
      * @return count Total number of listings created
      */
     function getTotalListings() external view returns (uint256) {
-        return _listingCounter.current();
+        return _listingCounter;
     }
     
     /**

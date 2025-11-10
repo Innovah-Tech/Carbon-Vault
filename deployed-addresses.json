@@ -1,0 +1,12 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "deployer": "0x7c538b83D0295f94C4bBAf8302095d9ED4b2Ad5f",
+  "timestamp": "2025-11-10T15:45:22.450Z",
+  "contracts": {
+    "CVTMinting": "0xc5645f895a48c8A572368AaFeaAb2D42d1203819",
+    "CVTStaking": "0x80bBdD4D4606DF5Ba6561e4B9C4a59B49061f713",
+    "CVTMarketplace": "0x290C258b604a3Cda5014B004ffe9c92Ab22D0F1c",
+    "ValidatorRewards": "0x647F8C626a90b5b8D4A69723bB672C759DD8A027"
+  }
+}

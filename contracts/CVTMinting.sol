@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IZKVerifier.sol";
 import "./ValidatorRewards.sol";
 
@@ -73,6 +73,63 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
         string memory projectId,
         address validator
     ) external nonReentrant {
+        _mintCVT(to, amount, proof, publicInputs, commitment, projectId, validator);
+    }
+    
+    /**
+     * @dev Batch mint CVT tokens (for multiple proofs)
+     * @param recipients Array of recipient addresses
+     * @param amounts Array of amounts to mint
+     * @param proofs Array of ZK proofs
+     * @param publicInputsArray Array of public inputs arrays
+     * @param commitments Array of commitment hashes
+     * @param projectIds Array of project identifiers
+     * @param validators Array of validator addresses (optional)
+     */
+    function batchMintCVT(
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        bytes[] calldata proofs,
+        uint256[][] calldata publicInputsArray,
+        bytes32[] calldata commitments,
+        string[] memory projectIds,
+        address[] calldata validators
+    ) external nonReentrant {
+        require(
+            recipients.length == amounts.length &&
+            amounts.length == proofs.length &&
+            proofs.length == publicInputsArray.length &&
+            publicInputsArray.length == commitments.length &&
+            commitments.length == projectIds.length &&
+            projectIds.length == validators.length,
+            "Array length mismatch"
+        );
+        
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _mintCVT(
+                recipients[i],
+                amounts[i],
+                proofs[i],
+                publicInputsArray[i],
+                commitments[i],
+                projectIds[i],
+                validators[i]
+            );
+        }
+    }
+    
+    /**
+     * @dev Internal mint function
+     */
+    function _mintCVT(
+        address to,
+        uint256 amount,
+        bytes calldata proof,
+        uint256[] calldata publicInputs,
+        bytes32 commitment,
+        string memory projectId,
+        address validator
+    ) internal {
         require(to != address(0), "Invalid recipient address");
         require(amount > 0, "Amount must be greater than 0");
         require(!mintedCommitments[commitment], "Commitment already used");
@@ -110,48 +167,6 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
         }
         
         emit CVTMinted(to, amount, commitment, projectId);
-    }
-    
-    /**
-     * @dev Batch mint CVT tokens (for multiple proofs)
-     * @param recipients Array of recipient addresses
-     * @param amounts Array of amounts to mint
-     * @param proofs Array of ZK proofs
-     * @param publicInputsArray Array of public inputs arrays
-     * @param commitments Array of commitment hashes
-     * @param projectIds Array of project identifiers
-     * @param validators Array of validator addresses (optional)
-     */
-    function batchMintCVT(
-        address[] calldata recipients,
-        uint256[] calldata amounts,
-        bytes[] calldata proofs,
-        uint256[][] calldata publicInputsArray,
-        bytes32[] calldata commitments,
-        string[] memory projectIds,
-        address[] calldata validators
-    ) external nonReentrant {
-        require(
-            recipients.length == amounts.length &&
-            amounts.length == proofs.length &&
-            proofs.length == publicInputsArray.length &&
-            publicInputsArray.length == commitments.length &&
-            commitments.length == projectIds.length &&
-            projectIds.length == validators.length,
-            "Array length mismatch"
-        );
-        
-        for (uint256 i = 0; i < recipients.length; i++) {
-            mintCVT(
-                recipients[i],
-                amounts[i],
-                proofs[i],
-                publicInputsArray[i],
-                commitments[i],
-                projectIds[i],
-                validators[i]
-            );
-        }
     }
     
     /**
