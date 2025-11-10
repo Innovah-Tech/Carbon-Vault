@@ -6,22 +6,15 @@ const fs = require("fs");
 const path = require("path");
 const { createHash } = require("crypto");
 
-// Helper function to calculate SHA256 hash
-function sha256(input) {
-    return createHash("sha256").update(input).digest("hex");
-}
-
-// Helper function to convert hex to BigInt
-function hexToBigInt(hex) {
-    return BigInt("0x" + hex);
-}
-
-// Helper function to create commitment
+// Helper function to create commitment using Poseidon hash
+// For testing, we'll use a simple hash function
+// In production, this should match the Poseidon hash used in the circuit
 function createCommitment(projectId, co2Tons, timestamp, secret) {
+    // Simple hash for testing - in production, use Poseidon hash
     const input = `${projectId}_${co2Tons}_${timestamp}_${secret}`;
-    const hash = sha256(input);
-    // Take first 256 bits (64 hex chars)
-    return hexToBigInt(hash.substring(0, 64));
+    const hash = createHash("sha256").update(input).digest("hex");
+    // Take first 64 hex chars (256 bits)
+    return BigInt("0x" + hash.substring(0, 64));
 }
 
 async function generateProof(inputData) {

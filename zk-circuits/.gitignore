@@ -1,0 +1,26 @@
+# Build artifacts
+build/
+*.wasm
+*.r1cs
+*.sym
+*.zkey
+*.ptau
+
+# Proof files
+proof.json
+test_proof.json
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+

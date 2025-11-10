@@ -2,6 +2,7 @@ pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/comparators.circom";
 include "../node_modules/circomlib/circuits/sha256/sha256.circom";
+include "../node_modules/circomlib/circuits/poseidon.circom";
 
 /*
  * CarbonOffsetVerifier Circuit
@@ -20,11 +21,11 @@ include "../node_modules/circomlib/circuits/sha256/sha256.circom";
  * - verifier_id: Authorized verifier identifier
  * 
  * Private inputs:
- * - project_id: Project identifier
- * - co2_tons: Actual CO2 amount in tons
- * - timestamp: Offset timestamp
- * - secret: Secret value used in commitment
- * - verifier_id_private: Private verifier identifier
+ * - project_id: Project identifier (private)
+ * - co2_tons: Actual CO2 amount in tons (private)
+ * - timestamp: Offset timestamp (private)
+ * - secret: Secret value used in commitment (private)
+ * - verifier_id_private: Private verifier identifier (private)
  */
 
 template CarbonOffsetVerifier() {
@@ -42,45 +43,17 @@ template CarbonOffsetVerifier() {
     signal input secret;               // Secret for commitment (private)
     signal input verifier_id_private; // Private verifier ID (private)
     
-    // Verify commitment matches
-    component hasher = Sha256(4);  // Hash 4 inputs: project_id, co2_tons, timestamp, secret
-    
-    // Convert inputs to bits for hashing
-    component project_id_bits = Num2Bits(256);
-    component co2_tons_bits = Num2Bits(64);
-    component timestamp_bits = Num2Bits(64);
-    component secret_bits = Num2Bits(256);
-    
-    // Convert project_id to bits
-    project_id_bits.in <== project_id;
-    
-    // Convert co2_tons to bits (assuming max 2^64 - 1)
-    co2_tons_bits.in <== co2_tons;
-    
-    // Convert timestamp to bits
-    timestamp_bits.in <== timestamp;
-    
-    // Convert secret to bits
-    secret_bits.in <== secret;
-    
-    // Prepare hash inputs (concatenate bits)
-    for (var i = 0; i < 256; i++) {
-        hasher.in[i] <== project_id_bits.out[i];
-    }
-    for (var i = 0; i < 64; i++) {
-        hasher.in[256 + i] <== co2_tons_bits.out[i];
-    }
-    for (var i = 0; i < 64; i++) {
-        hasher.in[256 + 64 + i] <== timestamp_bits.out[i];
-    }
-    for (var i = 0; i < 256; i++) {
-        hasher.in[256 + 64 + 64 + i] <== secret_bits.out[i];
-    }
+    // Use Poseidon hash for commitment (more efficient than SHA256 in ZK)
+    component hasher = Poseidon(4);
+    hasher.inputs[0] <== project_id;
+    hasher.inputs[1] <== co2_tons;
+    hasher.inputs[2] <== timestamp;
+    hasher.inputs[3] <== secret;
     
     // Verify commitment matches hash
     component commitment_check = IsEqual();
     commitment_check.in[0] <== commitment;
-    commitment_check.in[1] <== hasher.out[0];  // Use first 256 bits of hash
+    commitment_check.in[1] <== hasher.out;
     
     // Verify CO2 meets minimum requirement
     component co2_comparator = GreaterThan(64);
