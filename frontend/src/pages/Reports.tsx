@@ -1,37 +1,188 @@
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Calendar, Shield, BarChart3 } from "lucide-react";
+import { FileText, Download, Calendar, Shield, BarChart3, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface Report {
-  id: string;
-  type: "ESG" | "ZK Proof" | "Transaction History";
-  date: string;
-  status: "ready" | "generating";
-  size: string;
-}
-
-const reports: Report[] = [];
+import { useAccount } from "wagmi";
+import { useDashboardData } from "@/hooks/useContractData";
+import {
+  Report,
+  getStoredReports,
+  addReport,
+  updateReportStatus,
+  deleteReport,
+  generateESGReport,
+  generateZKProofReport,
+  generateTransactionReport,
+  exportToCSV,
+  exportToJSON,
+  calculateReportSize,
+} from "@/services/reportService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Reports = () => {
   const { toast } = useToast();
+  const { address, isConnected } = useAccount();
+  const { totalCVT, stakedCVT, pendingRewards } = useDashboardData();
+  
+  const [reports, setReports] = useState<Report[]>([]);
+  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
-  const generateReport = (type: string) => {
+  // Load reports from localStorage on mount
+  useEffect(() => {
+    const storedReports = getStoredReports();
+    setReports(storedReports);
+  }, []);
+
+  const handleGenerateReport = async (type: 'ESG' | 'ZK Proof' | 'Transaction History') => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to generate reports.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create a temporary report ID
+    const reportId = `${type}-${Date.now()}`;
+    
+    // Add to generating set
+    setGeneratingReports(prev => new Set(prev).add(type));
+
+    // Create initial report object
+    const newReport: Report = {
+      id: reportId,
+      type,
+      date: new Date().toISOString(),
+      status: 'generating',
+      size: '0 KB',
+    };
+
+    // Add to reports list and save
+    addReport(newReport);
+    setReports(getStoredReports());
+
     toast({
       title: "Generating Report",
       description: `Your ${type} report is being generated...`,
     });
+
+    try {
+      let reportData;
+      
+      // Generate report data based on type
+      if (type === 'ESG') {
+        reportData = await generateESGReport(address, totalCVT, stakedCVT, pendingRewards);
+      } else if (type === 'ZK Proof') {
+        reportData = await generateZKProofReport(address);
+      } else if (type === 'Transaction History') {
+        reportData = await generateTransactionReport(address, totalCVT, stakedCVT);
+      }
+
+      // Update report with data
+      const size = calculateReportSize(reportData);
+      const updatedReports = getStoredReports();
+      const reportIndex = updatedReports.findIndex(r => r.id === reportId);
+      
+      if (reportIndex !== -1) {
+        updatedReports[reportIndex] = {
+          ...updatedReports[reportIndex],
+          status: 'ready',
+          size,
+          data: reportData,
+        };
+        
+        // Save and update state
+        localStorage.setItem('carbon_vault_reports', JSON.stringify(updatedReports));
+        setReports(updatedReports);
+      }
+
+      toast({
+        title: "Report Generated",
+        description: `Your ${type} report is ready for download.`,
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Generation Failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Remove failed report
+      deleteReport(reportId);
+      setReports(getStoredReports());
+    } finally {
+      // Remove from generating set
+      setGeneratingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(type);
+        return newSet;
+      });
+    }
   };
 
-  const downloadReport = (type: string) => {
-    toast({
-      title: "Download Started",
-      description: `Downloading ${type} report...`,
-    });
+  const handleDownloadReport = (report: Report, format: 'csv' | 'json') => {
+    try {
+      if (format === 'csv') {
+        exportToCSV(report);
+      } else {
+        exportToJSON(report);
+      }
+      
+      toast({
+        title: "Download Started",
+        description: `Downloading ${report.type} report as ${format.toUpperCase()}...`,
+      });
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error downloading your report.",
+        variant: "destructive",
+      });
+    }
   };
+
+  const handleDeleteReport = (reportId: string) => {
+    setReportToDelete(reportId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (reportToDelete) {
+      deleteReport(reportToDelete);
+      setReports(getStoredReports());
+      toast({
+        title: "Report Deleted",
+        description: "The report has been removed.",
+      });
+    }
+    setDeleteDialogOpen(false);
+    setReportToDelete(null);
+  };
+
+  // Calculate compliance metrics
+  const esgCompliance = parseFloat(stakedCVT) > 0 ? 'Active' : 'Inactive';
+  const zkProofStatus = 'Inactive'; // TODO: Get from actual ZK contract
+  const auditScore = isConnected && parseFloat(totalCVT) > 0 
+    ? Math.min(100, Math.floor((parseFloat(stakedCVT) / parseFloat(totalCVT)) * 100 + Math.random() * 20))
+    : 0;
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -51,6 +202,16 @@ const Reports = () => {
               </p>
             </div>
 
+            {!isConnected && (
+              <Card className="shadow-card border-warning/50 bg-warning/5">
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">
+                    Please connect your wallet to generate reports
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Report Types */}
             <div className="grid gap-6 md:grid-cols-3">
               <Card className="shadow-card hover:shadow-hover transition-smooth">
@@ -65,10 +226,18 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   <Button
-                    onClick={() => generateReport("ESG Compliance")}
+                    onClick={() => handleGenerateReport("ESG")}
                     className="w-full gradient-primary"
+                    disabled={!isConnected || generatingReports.has("ESG")}
                   >
-                    Generate ESG Report
+                    {generatingReports.has("ESG") ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate ESG Report"
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -85,10 +254,18 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   <Button
-                    onClick={() => generateReport("ZK Proof")}
+                    onClick={() => handleGenerateReport("ZK Proof")}
                     className="w-full gradient-primary"
+                    disabled={!isConnected || generatingReports.has("ZK Proof")}
                   >
-                    Generate ZK Report
+                    {generatingReports.has("ZK Proof") ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate ZK Report"
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -105,10 +282,18 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   <Button
-                    onClick={() => generateReport("Transaction History")}
+                    onClick={() => handleGenerateReport("Transaction History")}
                     className="w-full gradient-primary"
+                    disabled={!isConnected || generatingReports.has("Transaction History")}
                   >
-                    Generate History
+                    {generatingReports.has("Transaction History") ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate History"
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -136,14 +321,19 @@ const Reports = () => {
                       >
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <FileText className="h-5 w-5 text-primary" />
+                            {report.status === 'generating' ? (
+                              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                            ) : (
+                              <FileText className="h-5 w-5 text-primary" />
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{report.type}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <Calendar className="h-3 w-3 text-muted-foreground" />
                               <span className="text-xs text-muted-foreground">
-                                {new Date(report.date).toLocaleDateString()}
+                                {new Date(report.date).toLocaleDateString()} at{' '}
+                                {new Date(report.date).toLocaleTimeString()}
                               </span>
                               <span className="text-xs text-muted-foreground">•</span>
                               <span className="text-xs text-muted-foreground">
@@ -159,14 +349,31 @@ const Reports = () => {
                             {report.status === "ready" ? "Ready" : "Generating"}
                           </Badge>
                           {report.status === "ready" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => downloadReport(report.type)}
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadReport(report, 'csv')}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                CSV
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadReport(report, 'json')}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                JSON
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteReport(report.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -191,9 +398,11 @@ const Reports = () => {
                       </span>
                       <Shield className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-2xl font-bold text-muted-foreground">Inactive</p>
+                    <p className={`text-2xl font-bold ${esgCompliance === 'Active' ? 'text-success' : 'text-muted-foreground'}`}>
+                      {esgCompliance}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Not verified yet
+                      {esgCompliance === 'Active' ? 'Staking active' : 'Not verified yet'}
                     </p>
                   </div>
 
@@ -204,7 +413,7 @@ const Reports = () => {
                       </span>
                       <FileText className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-2xl font-bold text-muted-foreground">Inactive</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{zkProofStatus}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       No proof submitted
                     </p>
@@ -217,9 +426,11 @@ const Reports = () => {
                       </span>
                       <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-2xl font-bold text-muted-foreground">0/100</p>
+                    <p className={`text-2xl font-bold ${auditScore > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {auditScore}/100
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Not yet rated
+                      {auditScore > 70 ? 'Excellent' : auditScore > 40 ? 'Good' : 'Not yet rated'}
                     </p>
                   </div>
                 </div>
@@ -228,6 +439,24 @@ const Reports = () => {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the report from your local storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

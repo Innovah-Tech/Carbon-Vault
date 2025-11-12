@@ -9,8 +9,10 @@ import { Progress } from "@/components/ui/progress";
 import { useDashboardData } from "@/hooks/useContractData";
 import { useAccount } from "wagmi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const navigate = useNavigate();
   const { isConnected } = useAccount();
   const { 
     totalCVT, 
@@ -163,7 +165,11 @@ const Index = () => {
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate('/reports')}
+                >
                   Generate Report
                 </Button>
               </CardContent>
