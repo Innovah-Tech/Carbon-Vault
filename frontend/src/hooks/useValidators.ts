@@ -3,6 +3,8 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 import { formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, VALIDATOR_REWARDS_ABI } from '@/lib/contracts';
 import { useToast } from '@/hooks/use-toast';
+import { addTransaction, updateTransactionStatus, getBlockExplorerUrl } from '@/services/transactionHistory';
+import { useValidatorRewardsContractBalance } from './useContractBalance';
 
 export function useValidatorRewards() {
   const { address } = useAccount();
@@ -39,6 +41,17 @@ export function useValidatorRewards() {
 
   const formattedRewards = pendingRewards ? formatUnits(pendingRewards as bigint, 18) : '0';
   const formattedRewardPerProof = rewardPerProof ? formatUnits(rewardPerProof as bigint, 18) : '1';
+  const proofCount = Number(verifiedCount || 0);
+
+  // Update validator storage when data changes
+  useEffect(() => {
+    if (address && verifiedCount !== undefined && pendingRewards !== undefined) {
+      import('@/services/validatorStorage').then(({ updateValidator }) => {
+        const totalRewards = (proofCount * parseFloat(formattedRewardPerProof)).toFixed(2);
+        updateValidator(address, proofCount, totalRewards, formattedRewards);
+      });
+    }
+  }, [address, verifiedCount, pendingRewards, proofCount, formattedRewards, formattedRewardPerProof]);
 
   const refetch = useCallback(() => {
     refetchRewards();
@@ -48,7 +61,7 @@ export function useValidatorRewards() {
   return {
     pendingRewards: formattedRewards,
     pendingRewardsRaw: pendingRewards as bigint | undefined,
-    verifiedProofsCount: Number(verifiedCount || 0),
+    verifiedProofsCount: proofCount,
     rewardPerProof: formattedRewardPerProof,
     rewardPerProofRaw: rewardPerProof as bigint | undefined,
     refetch,
@@ -56,6 +69,7 @@ export function useValidatorRewards() {
 }
 
 export function useClaimRewards() {
+  const { address } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [isPending, setIsPending] = useState(false);
@@ -64,9 +78,10 @@ export function useClaimRewards() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
   });
+  const { balanceRaw: contractBalance } = useValidatorRewardsContractBalance();
 
   const claimRewards = useCallback(async () => {
-    if (!writeContractAsync) {
+    if (!writeContractAsync || !address) {
       toast({
         title: 'Error',
         description: 'Unable to write to contract',
@@ -75,11 +90,22 @@ export function useClaimRewards() {
       return;
     }
 
+    // Check if contract has sufficient balance (warning only, don't block)
+    if (contractBalance && contractBalance < BigInt(10 ** 18)) { // Less than 1 CVT
+      toast({
+        title: 'Low Contract Balance',
+        description: 'The validator rewards contract may have insufficient CVT. The transaction might fail.',
+        variant: 'destructive',
+      });
+    }
+
     setIsPending(true);
+    setTxHash(undefined);
+
     try {
       toast({
         title: 'Claiming Rewards',
-        description: 'Please confirm the transaction...',
+        description: 'Please confirm the transaction in your wallet.',
       });
 
       const tx = await writeContractAsync({
@@ -90,11 +116,21 @@ export function useClaimRewards() {
 
       setTxHash(tx);
 
-      toast({
-        title: 'Rewards Claimed!',
-        description: 'Your rewards have been transferred to your wallet.',
+      // Add to transaction history
+      addTransaction({
+        hash: tx,
+        type: 'claim_validator',
+        status: 'pending',
+        timestamp: Date.now(),
+        address: address,
       });
 
+      toast({
+        title: 'Transaction Submitted',
+        description: 'Waiting for confirmation...',
+      });
+
+      setIsPending(false);
       return tx;
     } catch (error: any) {
       console.error('Error claiming rewards:', error);
@@ -104,6 +140,8 @@ export function useClaimRewards() {
         errorMessage = 'Transaction was rejected';
       } else if (error?.message?.includes('No rewards to claim')) {
         errorMessage = 'You have no rewards to claim';
+      } else if (error?.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
       }
 
       toast({
@@ -111,15 +149,35 @@ export function useClaimRewards() {
         description: errorMessage,
         variant: 'destructive',
       });
-      throw error;
-    } finally {
+
       setIsPending(false);
+      setTxHash(undefined);
+      throw error;
     }
-  }, [writeContractAsync, toast]);
+  }, [writeContractAsync, address, toast, contractBalance]);
+
+  // Show success toast when confirmed and update transaction history
+  useEffect(() => {
+    if (isConfirmed && txHash) {
+      updateTransactionStatus(txHash, 'confirmed');
+      
+      const explorerUrl = getBlockExplorerUrl(txHash);
+      
+      toast({
+        title: 'Rewards Claimed!',
+        description: `Your validator rewards have been transferred. View on Explorer: ${explorerUrl}`,
+        action: {
+          label: 'View Transaction',
+          onClick: () => window.open(explorerUrl, '_blank'),
+        },
+      });
+    }
+  }, [isConfirmed, txHash, toast]);
 
   return {
     claimRewards,
     isPending: isPending || isConfirming,
+    isConfirming,
     isConfirmed,
     txHash,
   };
@@ -203,32 +261,65 @@ export function useSubmitProof() {
 export function useValidatorsLeaderboard() {
   const [validators, setValidators] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { address: currentAddress } = useAccount();
+
+  const loadValidators = useCallback(async () => {
+    setIsLoading(true);
+    
+    try {
+      // Import storage functions dynamically to avoid issues
+      const { 
+        getLeaderboardData, 
+        calculateValidatorMetrics,
+        updateValidator,
+        registerValidator 
+      } = await import('@/services/validatorStorage');
+      
+      // Get stored validators
+      const storedValidators = getLeaderboardData('proofs');
+      
+      // Register current user if connected
+      if (currentAddress) {
+        registerValidator(currentAddress);
+      }
+      
+      // Transform data for display
+      const transformedValidators = storedValidators.map((v, index) => {
+        const metrics = calculateValidatorMetrics(v);
+        
+        return {
+          address: v.address,
+          verifiedProofsCount: v.verifiedProofsCount,
+          totalRewards: v.totalRewards,
+          pendingRewards: v.pendingRewards,
+          avgRewardPerProof: metrics.avgRewardPerProof,
+          proofsPerDay: metrics.proofsPerDay,
+          reputation: metrics.reputation,
+          isActive: metrics.isActive,
+          rank: index + 1,
+          daysSinceJoined: metrics.daysSinceJoined,
+          successRate: '0', // Can be calculated from submission data if available
+          lastUpdated: v.lastUpdated,
+        };
+      });
+      
+      setValidators(transformedValidators);
+    } catch (error) {
+      console.error('Error loading validators:', error);
+      setValidators([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentAddress]);
 
   useEffect(() => {
-    // In production, fetch from blockchain or subgraph
-    // For now, using mock data
-    const mockValidators = Array.from({ length: 10 }, (_, i) => ({
-      address: `0x${Math.random().toString(16).substr(2, 40)}`,
-      verifiedProofsCount: Math.floor(Math.random() * 150) + 10,
-      totalRewards: (Math.random() * 100 + 10).toFixed(2),
-      successRate: (70 + Math.random() * 25).toFixed(1),
-      reputation: Math.floor(Math.random() * 40) + 60,
-      rank: i + 1,
-    }));
-
-    mockValidators.sort((a, b) => b.verifiedProofsCount - a.verifiedProofsCount);
-    mockValidators.forEach((v, i) => (v.rank = i + 1));
-
-    setValidators(mockValidators);
-    setIsLoading(false);
-  }, []);
+    loadValidators();
+  }, [loadValidators]);
 
   return {
     validators,
     isLoading,
-    refetch: () => {
-      // Implement refetch logic
-    },
+    refetch: loadValidators,
   };
 }
 

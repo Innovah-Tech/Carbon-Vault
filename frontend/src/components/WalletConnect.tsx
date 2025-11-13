@@ -1,6 +1,6 @@
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import { Button } from "@/components/ui/button";
-import { Wallet, LogOut, AlertCircle } from "lucide-react";
+import { Wallet, LogOut, AlertCircle, Coins } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { mantleSepolia } from "@/lib/wagmi";
+import { useCVTBalance } from "@/hooks/useContractData";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function WalletConnect() {
   const { address, isConnected } = useAccount();
@@ -19,6 +21,7 @@ export function WalletConnect() {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const { toast } = useToast();
+  const { balance, isLoading: balanceLoading } = useCVTBalance();
 
   const connectWallet = async () => {
     try {
@@ -117,19 +120,46 @@ export function WalletConnect() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Wallet className="h-4 w-4" />
-          <span className="hidden sm:inline">
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-xs font-normal text-muted-foreground leading-none mb-0.5">
+              {balanceLoading ? (
+                <Skeleton className="h-3 w-12" />
+              ) : (
+                `${parseFloat(balance).toFixed(2)} CVT`
+              )}
+            </span>
+            <span className="text-xs font-medium leading-none">
+              {address?.slice(0, 6)}...{address?.slice(-4)}
+            </span>
+          </div>
+          <span className="sm:hidden">
             {address?.slice(0, 6)}...{address?.slice(-4)}
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>My Wallet</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs text-muted-foreground font-mono">
-          {address}
+        <DropdownMenuItem className="text-xs text-muted-foreground font-mono flex-col items-start gap-1">
+          <span className="font-semibold text-foreground">Address:</span>
+          <span className="break-all">{address}</span>
         </DropdownMenuItem>
-        <DropdownMenuItem className="text-xs text-muted-foreground">
-          Network: Mantle Sepolia
+        <DropdownMenuItem className="text-xs text-muted-foreground flex items-center justify-between">
+          <span>Network:</span>
+          <span className="font-medium text-foreground">Mantle Sepolia</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-xs text-muted-foreground flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <Coins className="h-3 w-3" />
+            <span>CVT Balance:</span>
+          </div>
+          <span className="font-semibold text-foreground">
+            {balanceLoading ? (
+              <Skeleton className="h-3 w-16" />
+            ) : (
+              `${parseFloat(balance).toFixed(2)} CVT`
+            )}
+          </span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={disconnectWallet} className="text-destructive">

@@ -8,6 +8,7 @@ import Validators from "./pages/Validators";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import "./utils/devTools"; // Load dev tools for console access
 
 const App = () => (
   <TooltipProvider>

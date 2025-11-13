@@ -4,6 +4,7 @@ import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESSES, CVT_MARKETPLACE_ABI, ERC20_ABI } from '@/lib/contracts';
 import { MarketplaceListing, parseListing } from '@/services/marketplaceService';
 import { useToast } from '@/hooks/use-toast';
+import { addTransaction, updateTransactionStatus, getBlockExplorerUrl } from '@/services/transactionHistory';
 
 // Hook to fetch all marketplace listings with multicall
 export function useMarketplaceListings() {
@@ -305,6 +306,7 @@ export function useBuyListing() {
 }
 
 export function useCancelListing() {
+  const { address } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [isPending, setIsPending] = useState(false);
@@ -316,7 +318,7 @@ export function useCancelListing() {
 
   const cancelListing = useCallback(
     async (listingId: number) => {
-      if (!writeContractAsync) {
+      if (!writeContractAsync || !address) {
         toast({
           title: 'Error',
           description: 'Unable to write to contract',
@@ -326,10 +328,12 @@ export function useCancelListing() {
       }
 
       setIsPending(true);
+      setTxHash(undefined);
+
       try {
         toast({
           title: 'Cancelling Listing',
-          description: 'Please confirm the transaction...',
+          description: 'Please confirm the transaction in your wallet.',
         });
 
         const cancelTx = await writeContractAsync({
@@ -341,11 +345,21 @@ export function useCancelListing() {
 
         setTxHash(cancelTx);
 
-        toast({
-          title: 'Listing Cancelled',
-          description: 'Your tokens have been returned to your wallet.',
+        // Add to transaction history
+        addTransaction({
+          hash: cancelTx,
+          type: 'cancel_listing',
+          status: 'pending',
+          timestamp: Date.now(),
+          address: address,
         });
 
+        toast({
+          title: 'Transaction Submitted',
+          description: 'Waiting for confirmation...',
+        });
+
+        setIsPending(false);
         return cancelTx;
       } catch (error: any) {
         console.error('Error cancelling listing:', error);
@@ -355,6 +369,10 @@ export function useCancelListing() {
           errorMessage = 'Transaction was rejected';
         } else if (error?.message?.includes('Not the seller')) {
           errorMessage = 'You are not the seller of this listing';
+        } else if (error?.message?.includes('Listing not active')) {
+          errorMessage = 'This listing is no longer active';
+        } else if (error?.message?.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds for gas fees';
         }
         
         toast({
@@ -362,17 +380,37 @@ export function useCancelListing() {
           description: errorMessage,
           variant: 'destructive',
         });
-        throw error;
-      } finally {
+
         setIsPending(false);
+        setTxHash(undefined);
+        throw error;
       }
     },
-    [writeContractAsync, toast]
+    [writeContractAsync, address, toast]
   );
+
+  // Show success toast when confirmed and update transaction history
+  useEffect(() => {
+    if (isConfirmed && txHash) {
+      updateTransactionStatus(txHash, 'confirmed');
+      
+      const explorerUrl = getBlockExplorerUrl(txHash);
+      
+      toast({
+        title: 'Listing Cancelled!',
+        description: `Your tokens have been returned to your wallet. View on Explorer: ${explorerUrl}`,
+        action: {
+          label: 'View Transaction',
+          onClick: () => window.open(explorerUrl, '_blank'),
+        },
+      });
+    }
+  }, [isConfirmed, txHash, toast]);
 
   return {
     cancelListing,
     isPending: isPending || isConfirming,
+    isConfirming,
     isConfirmed,
     txHash,
   };

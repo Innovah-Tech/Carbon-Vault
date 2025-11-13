@@ -67,8 +67,6 @@ import {
   addSubmission,
   getSubmissionsByValidator,
   calculateValidatorStats,
-  generateMockValidators,
-  calculateGlobalStats,
   formatValidatorAddress,
   getReputationTier,
   timeAgo,
@@ -78,6 +76,7 @@ import {
   calculateEstimatedReward,
   ProofSubmission,
 } from "@/services/validatorService";
+import { ProofSubmissionGuide } from "@/components/ProofSubmissionGuide";
 
 const statusConfig = {
   pending: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Pending" },
@@ -105,7 +104,6 @@ const Validators = () => {
 
   // Local state
   const [submissions, setSubmissions] = useState<ProofSubmission[]>([]);
-  const [mockValidators, setMockValidators] = useState(generateMockValidators(20));
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   
   // Form state
@@ -136,12 +134,38 @@ const Validators = () => {
     return getSubmissionsByValidator(address);
   }, [address, submissions]);
 
-  // Global stats
-  const globalStats = useMemo(() => calculateGlobalStats(mockValidators), [mockValidators]);
+  // Global stats - now uses real leaderboard data
+  const globalStats = useMemo(() => {
+    if (leaderboard.length === 0) {
+      return {
+        totalValidators: 0,
+        activeValidators: 0,
+        totalProofs: 0,
+        totalRewards: '0',
+        avgRewardPerValidator: '0',
+        avgProofsPerValidator: '0',
+      };
+    }
+    
+    const activeValidators = leaderboard.filter(v => v.isActive).length;
+    const totalProofs = leaderboard.reduce((sum, v) => sum + v.verifiedProofsCount, 0);
+    const totalRewards = leaderboard.reduce((sum, v) => sum + parseFloat(v.totalRewards || '0'), 0);
+    const avgRewardPerValidator = leaderboard.length > 0 ? (totalRewards / leaderboard.length).toFixed(2) : '0';
+    const avgProofsPerValidator = leaderboard.length > 0 ? Math.round(totalProofs / leaderboard.length).toString() : '0';
+    
+    return {
+      totalValidators: leaderboard.length,
+      activeValidators,
+      totalProofs,
+      totalRewards: totalRewards.toFixed(2),
+      avgRewardPerValidator,
+      avgProofsPerValidator,
+    };
+  }, [leaderboard]);
 
   // Filter and sort leaderboard
   const filteredLeaderboard = useMemo(() => {
-    let filtered = mockValidators;
+    let filtered = leaderboard;
 
     // Filter by search
     if (searchTerm) {
@@ -174,7 +198,7 @@ const Validators = () => {
     }
 
     return sorted;
-  }, [mockValidators, searchTerm, sortBy, filterActive]);
+  }, [leaderboard, searchTerm, sortBy, filterActive]);
 
   // Handle proof submission
   const handleSubmitProof = async () => {
@@ -684,6 +708,9 @@ const Validators = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Proof Submission Guide */}
+                <ProofSubmissionGuide />
               </TabsContent>
 
               {/* Submissions Tab */}

@@ -10,6 +10,20 @@ import { useDashboardData } from "@/hooks/useContractData";
 import { useAccount } from "wagmi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useStake, useUnstake, useClaimYield } from "@/hooks/useStaking";
+import { useCVTPrice } from "@/hooks/useCVTPrice";
+import { CVTPriceChart } from "@/components/CVTPriceChart";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -21,11 +35,59 @@ const Index = () => {
     stakedPercentage, 
     pendingRewards, 
     apy, 
-    isLoading 
+    isLoading,
+    refetch 
   } = useDashboardData();
 
-  // Mock USD price (in production, fetch from price oracle)
-  const CVT_PRICE_USD = 1.25;
+  // Staking hooks
+  const { stakeTokens, isProcessing: isStaking } = useStake();
+  const { unstakeTokens, isProcessing: isUnstaking } = useUnstake();
+  const { claimRewards, isProcessing: isClaiming } = useClaimYield();
+
+  // Price hook
+  const { price } = useCVTPrice();
+  const CVT_PRICE_USD = price.current;
+
+  // Dialog states
+  const [stakeDialogOpen, setStakeDialogOpen] = useState(false);
+  const [unstakeDialogOpen, setUnstakeDialogOpen] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [unstakeAmount, setUnstakeAmount] = useState("");
+
+  // Handler functions
+  const handleStake = async () => {
+    try {
+      await stakeTokens(stakeAmount);
+      setStakeDialogOpen(false);
+      setStakeAmount("");
+      // Refetch dashboard data after successful stake
+      setTimeout(() => refetch(), 2000);
+    } catch (error) {
+      // Error handled by hook
+    }
+  };
+
+  const handleUnstake = async () => {
+    try {
+      await unstakeTokens(unstakeAmount);
+      setUnstakeDialogOpen(false);
+      setUnstakeAmount("");
+      // Refetch dashboard data after successful unstake
+      setTimeout(() => refetch(), 2000);
+    } catch (error) {
+      // Error handled by hook
+    }
+  };
+
+  const handleClaimRewards = async () => {
+    try {
+      await claimRewards();
+      // Refetch dashboard data after successful claim
+      setTimeout(() => refetch(), 2000);
+    } catch (error) {
+      // Error handled by hook
+    }
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -116,20 +178,34 @@ const Index = () => {
                       </div>
                     </div>
 
-                    <div className="flex gap-3 pt-2">
-                      <Button 
-                        className="flex-1 gradient-primary"
-                        disabled={parseFloat(availableCVT) === 0}
-                      >
-                        Stake More
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        disabled={parseFloat(stakedCVT) === 0}
-                      >
-                        Unstake
-                      </Button>
+                    <div className="space-y-3 pt-2">
+                      <div className="flex gap-3">
+                        <Button 
+                          className="flex-1 gradient-primary"
+                          disabled={parseFloat(availableCVT) === 0 || isStaking}
+                          onClick={() => setStakeDialogOpen(true)}
+                        >
+                          {isStaking ? "Staking..." : "Stake More"}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          disabled={parseFloat(stakedCVT) === 0 || isUnstaking}
+                          onClick={() => setUnstakeDialogOpen(true)}
+                        >
+                          {isUnstaking ? "Unstaking..." : "Unstake"}
+                        </Button>
+                      </div>
+                      {parseFloat(pendingRewards) > 0 && (
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={handleClaimRewards}
+                          disabled={isClaiming}
+                        >
+                          {isClaiming ? "Claiming..." : `Claim ${pendingRewards} CVT Rewards`}
+                        </Button>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -176,11 +252,126 @@ const Index = () => {
             </Card>
           </div>
 
+          {/* CVT Price Chart */}
+          <CVTPriceChart />
+
           {/* Recent Transactions */}
           <RecentTransactions />
         </div>
       </main>
       </div>
+
+      {/* Stake Dialog */}
+      <Dialog open={stakeDialogOpen} onOpenChange={setStakeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Stake CVT Tokens</DialogTitle>
+            <DialogDescription>
+              Enter the amount of CVT tokens you want to stake. You'll earn rewards based on the current APY.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="stake-amount">Amount</Label>
+              <Input
+                id="stake-amount"
+                type="number"
+                placeholder="0.00"
+                value={stakeAmount}
+                onChange={(e) => setStakeAmount(e.target.value)}
+                step="0.01"
+                min="0"
+                max={availableCVT}
+              />
+              <p className="text-sm text-muted-foreground">
+                Available: {availableCVT} CVT
+              </p>
+            </div>
+            <Button
+              variant="link"
+              className="h-auto p-0 text-sm"
+              onClick={() => setStakeAmount(availableCVT)}
+            >
+              Stake Max
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStakeDialogOpen(false);
+                setStakeAmount("");
+              }}
+              disabled={isStaking}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStake}
+              disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || parseFloat(stakeAmount) > parseFloat(availableCVT) || isStaking}
+              className="gradient-primary"
+            >
+              {isStaking ? "Staking..." : "Stake"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unstake Dialog */}
+      <Dialog open={unstakeDialogOpen} onOpenChange={setUnstakeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unstake CVT Tokens</DialogTitle>
+            <DialogDescription>
+              Enter the amount of CVT tokens you want to unstake. Your tokens will be returned to your wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="unstake-amount">Amount</Label>
+              <Input
+                id="unstake-amount"
+                type="number"
+                placeholder="0.00"
+                value={unstakeAmount}
+                onChange={(e) => setUnstakeAmount(e.target.value)}
+                step="0.01"
+                min="0"
+                max={stakedCVT}
+              />
+              <p className="text-sm text-muted-foreground">
+                Staked: {stakedCVT} CVT
+              </p>
+            </div>
+            <Button
+              variant="link"
+              className="h-auto p-0 text-sm"
+              onClick={() => setUnstakeAmount(stakedCVT)}
+            >
+              Unstake Max
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUnstakeDialogOpen(false);
+                setUnstakeAmount("");
+              }}
+              disabled={isUnstaking}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUnstake}
+              disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0 || parseFloat(unstakeAmount) > parseFloat(stakedCVT) || isUnstaking}
+              className="gradient-primary"
+            >
+              {isUnstaking ? "Unstaking..." : "Unstake"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

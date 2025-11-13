@@ -50,7 +50,7 @@ export function useStakingInfo() {
       {
         address: CONTRACT_ADDRESSES.CVTStaking as `0x${string}`,
         abi: CVT_STAKING_ABI,
-        functionName: 'yieldRatePerSecond',
+        functionName: 'yieldPerSecond',
       },
     ],
     query: {
@@ -114,11 +114,12 @@ export function useCalculateAPY() {
 
 // Hook to get all dashboard data at once
 export function useDashboardData() {
-  const { balance, isLoading: balanceLoading } = useCVTBalance()
+  const { balance, isLoading: balanceLoading, refetch: refetchBalance } = useCVTBalance()
   const {
     stakedAmount,
     pendingRewards,
     isLoading: stakingLoading,
+    refetch: refetchStaking,
   } = useStakingInfo()
   const apy = useCalculateAPY()
 
@@ -126,6 +127,11 @@ export function useDashboardData() {
   const stakedPercentage = totalHoldings > 0 
     ? ((parseFloat(stakedAmount) / totalHoldings) * 100).toFixed(1)
     : '0'
+
+  const refetchAll = () => {
+    refetchBalance()
+    refetchStaking()
+  }
 
   return {
     totalCVT: totalHoldings.toFixed(2),
@@ -135,6 +141,7 @@ export function useDashboardData() {
     pendingRewards: parseFloat(pendingRewards).toFixed(4),
     apy: parseFloat(apy).toFixed(2),
     isLoading: balanceLoading || stakingLoading,
+    refetch: refetchAll,
   }
 }
 

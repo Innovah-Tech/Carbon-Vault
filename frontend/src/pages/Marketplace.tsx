@@ -262,6 +262,8 @@ const Marketplace = () => {
       await cancelListing(listingToCancel.id);
       setCancelDialogOpen(false);
       setListingToCancel(null);
+      // Refetch listings after successful cancellation
+      setTimeout(() => refetch(), 2000);
     } catch (error) {
       // Error handled by hook
     }
