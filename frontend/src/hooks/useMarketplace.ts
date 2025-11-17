@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { addTransaction, updateTransactionStatus, getBlockExplorerUrl } from '@/services/transactionHistory';
 import { updatePriceFromListings } from '@/services/priceService';
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+
 // Hook to fetch all marketplace listings with multicall
 export function useMarketplaceListings() {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
@@ -218,12 +220,7 @@ export function useBuyListing() {
     hash: txHash,
   });
 
-  // Get stablecoin address from marketplace
-  const { data: stablecoinAddress } = useReadContract({
-    address: CONTRACT_ADDRESSES.CVTMarketplace as `0x${string}`,
-    abi: CVT_MARKETPLACE_ABI,
-    functionName: 'stablecoin',
-  });
+  const { stablecoinAddress, isNativePayment } = useMarketplacePaymentAsset();
 
   // Get marketplace fee
   const { data: feeBps } = useReadContract({
@@ -233,13 +230,16 @@ export function useBuyListing() {
   });
 
   // Check stablecoin allowance
+  const shouldCheckAllowance =
+    !!address && !!stablecoinAddress && stablecoinAddress.toLowerCase() !== ZERO_ADDRESS.toLowerCase();
+
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: stablecoinAddress as `0x${string}`,
+    address: shouldCheckAllowance ? (stablecoinAddress as `0x${string}`) : undefined,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address && stablecoinAddress ? [address, CONTRACT_ADDRESSES.CVTMarketplace as `0x${string}`] : undefined,
+    args: shouldCheckAllowance ? [address, CONTRACT_ADDRESSES.CVTMarketplace as `0x${string}`] : undefined,
     query: {
-      enabled: !!address && !!stablecoinAddress,
+      enabled: shouldCheckAllowance,
     },
   });
 
@@ -254,7 +254,7 @@ export function useBuyListing() {
         return;
       }
 
-      if (!stablecoinAddress) {
+      if (!stablecoinAddress && !isNativePayment) {
         toast({
           title: 'Error',
           description: 'Stablecoin address not found',
@@ -262,32 +262,9 @@ export function useBuyListing() {
         });
         return;
       }
-
-      // Check if stablecoin address is valid (not zero address and not the user's address)
-      const stablecoinAddr = stablecoinAddress as `0x${string}`;
-      const zeroAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
       
-      if (stablecoinAddr.toLowerCase() === zeroAddress.toLowerCase()) {
-        toast({
-          title: 'Error',
-          description: 'Stablecoin address is not configured. Please contact the administrator.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // If stablecoin address is the same as user's address (mock/test setup), skip approval
-      const needsApproval = stablecoinAddr.toLowerCase() !== address.toLowerCase();
-      
-      // Warn if stablecoin is user's address (invalid configuration)
-      if (!needsApproval) {
-        toast({
-          title: 'Warning',
-          description: 'Stablecoin address is not properly configured. Purchase may fail. Please contact administrator.',
-          variant: 'destructive',
-        });
-        // Still proceed, but it will likely fail at contract level
-      }
+      const stablecoinAddr = (stablecoinAddress || ZERO_ADDRESS) as `0x${string}`;
+      const needsApproval = !isNativePayment && stablecoinAddr.toLowerCase() !== address.toLowerCase();
       
       setIsPending(true);
       try {
@@ -339,9 +316,6 @@ export function useBuyListing() {
               description: 'Proceeding with purchase...',
             });
           }
-        } else {
-          // Mock/test setup - stablecoin is user's address, skip approval
-          console.warn('Stablecoin address is user address (mock setup), skipping approval');
         }
 
         // Step 2: Purchase CVT tokens
@@ -355,6 +329,7 @@ export function useBuyListing() {
           abi: CVT_MARKETPLACE_ABI,
           functionName: 'buyCVT',
           args: [BigInt(listingId), amountWei],
+          value: isNativePayment ? totalNeededWei : undefined,
         });
 
         setTxHash(buyTx);
@@ -397,7 +372,7 @@ export function useBuyListing() {
         setIsPending(false);
       }
     },
-    [writeContractAsync, toast, address, stablecoinAddress, feeBps, allowance, refetchAllowance]
+    [writeContractAsync, toast, address, stablecoinAddress, isNativePayment, feeBps, allowance, refetchAllowance]
   );
 
   return {
@@ -532,6 +507,22 @@ export function useMarketplaceFee() {
   return {
     feeBps: Number(feeBps || 250),
     feePercentage,
+  };
+}
+
+export function useMarketplacePaymentAsset() {
+  const { data: stablecoinAddress } = useReadContract({
+    address: CONTRACT_ADDRESSES.CVTMarketplace as `0x${string}`,
+    abi: CVT_MARKETPLACE_ABI,
+    functionName: 'stablecoin',
+  });
+
+  const addressStr = stablecoinAddress || ZERO_ADDRESS;
+  const isNativePayment = addressStr.toLowerCase() === ZERO_ADDRESS.toLowerCase();
+
+  return {
+    stablecoinAddress: stablecoinAddress as `0x${string}` | undefined,
+    isNativePayment,
   };
 }
 

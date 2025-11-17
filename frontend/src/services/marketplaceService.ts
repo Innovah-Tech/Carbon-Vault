@@ -1,5 +1,14 @@
 import { formatUnits, parseUnits } from 'viem';
 
+// Pricing anchors (Nov 17 2025)
+// Source: CarbonMinus "Carbon Credits 2025" (nature-based removals ≈ $24/t)
+// Source: Coinpedia live Mantle price (MNT ≈ $1.19)
+export const MNT_PRICE_USD = 1.19;
+export const CVT_REFERENCE_PRICE_USD = 24;
+export const CVT_REFERENCE_PRICE_MNT = CVT_REFERENCE_PRICE_USD / MNT_PRICE_USD; // ≈20.17
+export const MIN_LISTING_PRICE_MNT = 1;
+export const MIN_LISTING_PRICE_USD = MIN_LISTING_PRICE_MNT * MNT_PRICE_USD;
+
 export interface MarketplaceListing {
   id: number;
   seller: string;
@@ -161,6 +170,10 @@ export function validateListingParams(params: CreateListingParams): string | nul
   if (!pricePerToken || parseFloat(pricePerToken) <= 0) {
     return 'Price must be greater than 0';
   }
+
+  if (parseFloat(pricePerToken) < MIN_LISTING_PRICE_USD) {
+    return `Price must be at least ${MIN_LISTING_PRICE_MNT} MNT (~$${MIN_LISTING_PRICE_USD.toFixed(2)}) per CVT`;
+  }
   
   if (expiresInDays < 0) {
     return 'Expiration days cannot be negative';
@@ -319,5 +332,13 @@ export function exportListingsToCSV(listings: MarketplaceListing[]): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Convert a USD price to MNT equivalent
+export function usdToMnt(priceUsd: number): number {
+  if (Number.isNaN(priceUsd)) {
+    return 0;
+  }
+  return priceUsd / MNT_PRICE_USD;
 }
 

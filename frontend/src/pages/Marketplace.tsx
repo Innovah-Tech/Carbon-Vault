@@ -60,6 +60,7 @@ import {
   useBuyListing,
   useCancelListing,
   useMarketplaceFee,
+  useMarketplacePaymentAsset,
 } from "@/hooks/useMarketplace";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import {
@@ -75,6 +76,11 @@ import {
   getExpirationStatus,
   calculateMarketplaceStats,
   exportListingsToCSV,
+  CVT_REFERENCE_PRICE_MNT,
+  CVT_REFERENCE_PRICE_USD,
+  MIN_LISTING_PRICE_MNT,
+  MIN_LISTING_PRICE_USD,
+  usdToMnt,
 } from "@/services/marketplaceService";
 import { MarketplaceAnalytics } from "@/components/MarketplaceAnalytics";
 import { saveAnalyticsSnapshot } from "@/services/analyticsService";
@@ -90,6 +96,7 @@ const Marketplace = () => {
   const { buyListing, isPending: isBuying, isConfirmed: purchaseCompleted } = useBuyListing();
   const { cancelListing, isPending: isCancelling, isConfirmed: cancelCompleted } = useCancelListing();
   const { feePercentage } = useMarketplaceFee();
+  const { stablecoinAddress, isNativePayment } = useMarketplacePaymentAsset();
   
   // Watchlist hooks
   const { 
@@ -317,13 +324,17 @@ const Marketplace = () => {
               <h1 className="text-3xl font-bold text-foreground mb-2">
                 Marketplace
               </h1>
-                <p className="text-muted-foreground flex items-center gap-2">
-                Buy and sell carbon credit tokens
+                <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                  Buy and sell carbon credit tokens
                   {lastFetchTime && (
                     <span className="text-xs">
                       • Last updated {new Date(lastFetchTime).toLocaleTimeString()}
                     </span>
                   )}
+                  <span className="text-xs">
+                    • Payments in {isNativePayment ? "MNT (native)" : "stablecoin"}
+                    {!isNativePayment && stablecoinAddress ? ` (${stablecoinAddress})` : ""}
+                  </span>
                 </p>
               </div>
               <div className="flex gap-3">
@@ -372,14 +383,50 @@ const Marketplace = () => {
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="price">Price per Token (USD)</Label>
-                        <Input
-                          id="price"
-                          type="number"
-                          placeholder="0.00"
-                          value={newListingPrice}
-                          onChange={(e) => setNewListingPrice(e.target.value)}
-                        />
+                        <Label htmlFor="price">
+                          Price per Token ({isNativePayment ? "MNT (native)" : "USD / Stablecoin"})
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="price"
+                            type="number"
+                            placeholder="0.00"
+                            value={newListingPrice}
+                            onChange={(e) => setNewListingPrice(e.target.value)}
+                          />
+                          {!isNativePayment && (
+                            <div className="text-xs text-muted-foreground min-w-[120px]">
+                              ≈{" "}
+                              {newListingPrice && !Number.isNaN(parseFloat(newListingPrice))
+                                ? `${usdToMnt(parseFloat(newListingPrice)).toFixed(2)} MNT`
+                                : "0.00 MNT"}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {!isNativePayment ? (
+                            <>
+                              <p>
+                                Minimum: ${MIN_LISTING_PRICE_USD.toFixed(2)} ({MIN_LISTING_PRICE_MNT} MNT) per CVT
+                              </p>
+                              <p>
+                                Recommended: ${CVT_REFERENCE_PRICE_USD.toFixed(2)} (
+                                {CVT_REFERENCE_PRICE_MNT.toFixed(2)} MNT) based on Sept&nbsp;2025 nature-based removals.
+                              </p>
+                              {newListingPrice &&
+                                parseFloat(newListingPrice) < CVT_REFERENCE_PRICE_USD &&
+                                parseFloat(newListingPrice) >= MIN_LISTING_PRICE_USD && (
+                                  <p className="text-amber-600">
+                                    Heads up: this price is below the current reference valuation.
+                                  </p>
+                                )}
+                            </>
+                          ) : (
+                            <p>
+                              Marketplace is configured for native MNT payments. Enter the per-CVT price in MNT (18 decimals).
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="expires">Expires In (Days)</Label>
@@ -657,13 +704,18 @@ const Marketplace = () => {
                       
                       <div className="flex items-center justify-between pt-2">
                         <div>
-                                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                    <DollarSign className="h-3 w-3" />
-                                    Price per CVT
-                                  </p>
-                          <p className="text-2xl font-bold text-foreground">
-                                    ${listing.pricePerToken}
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            Price per CVT ({isNativePayment ? "MNT" : "Stablecoin"})
                           </p>
+                          <p className="text-2xl font-bold text-foreground">
+                            ${listing.pricePerToken}
+                          </p>
+                          {!isNativePayment && (
+                            <p className="text-xs text-muted-foreground">
+                              ≈ {usdToMnt(parseFloat(listing.pricePerToken || "0")).toFixed(2)} MNT
+                            </p>
+                          )}
                         </div>
                                 {isOwner ? (
                                   <Button
