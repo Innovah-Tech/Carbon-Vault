@@ -463,7 +463,7 @@ export function ProofSubmissionGuide() {
             </div>
             <Button variant="outline" size="sm" asChild>
               <a
-                href="https://github.com/your-repo/carbon-vault/blob/main/PROOF_SUBMISSION_GUIDE.md"
+                href="https://github.com/Innovah-Tech/Carbon-Vault/blob/main/PROOF_SUBMISSION_GUIDE.md"
                 target="_blank"
                 rel="noopener noreferrer"
               >
