@@ -166,7 +166,7 @@ function formatNumber(num) {
 async function mintCVT(cvtContract, config, signer) {
   const recipient = config.recipient || signer.address;
   const amount = hre.ethers.parseEther(config.amount);
-  const timestamp = Math.floor(Date.now() / 1000);
+  const timestamp = config.timestamp || Math.floor(Date.now() / 1000);
 
   console.log("\n🌍 Minting Parameters:");
   console.log(`  Recipient: ${recipient}`);
@@ -417,12 +417,20 @@ async function main() {
   console.log("\n");
 }
 
-// Execute
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("\n❌ Fatal Error:");
-    console.error(error);
-    process.exit(1);
-  });
+if (require.main === module) {
+  main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error("\n❌ Fatal Error:");
+      console.error(error);
+      process.exit(1);
+    });
+}
+
+module.exports = {
+  mintCVT,
+  saveMintingRecord,
+  generateCommitment,
+  generateMockProof,
+};
 

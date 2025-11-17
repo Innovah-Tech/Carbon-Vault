@@ -5,6 +5,7 @@ import {
   ERC20_ABI,
   CVT_STAKING_ABI,
   VALIDATOR_REWARDS_ABI,
+  CVT_MINTING_ABI,
 } from '@/lib/contracts'
 
 // Hook to get CVT balance
@@ -142,6 +143,47 @@ export function useDashboardData() {
     apy: parseFloat(apy).toFixed(2),
     isLoading: balanceLoading || stakingLoading,
     refetch: refetchAll,
+  }
+}
+
+export function useFaucetInfo() {
+  const { address } = useAccount()
+
+  const { data, isLoading, refetch } = useReadContracts({
+    contracts: [
+      {
+        address: CONTRACT_ADDRESSES.CVTMinting as `0x${string}`,
+        abi: CVT_MINTING_ABI,
+        functionName: 'faucetAmount',
+      },
+      {
+        address: CONTRACT_ADDRESSES.CVTMinting as `0x${string}`,
+        abi: CVT_MINTING_ABI,
+        functionName: 'faucetCooldown',
+      },
+      {
+        address: CONTRACT_ADDRESSES.CVTMinting as `0x${string}`,
+        abi: CVT_MINTING_ABI,
+        functionName: 'lastFaucetMint',
+        args: address ? [address] : undefined,
+      },
+    ],
+    query: {
+      enabled: !!address,
+    },
+  })
+
+  const amount = data?.[0]?.result as bigint | undefined
+  const cooldown = data?.[1]?.result as bigint | undefined
+  const lastMint = data?.[2]?.result as bigint | undefined
+
+  return {
+    faucetAmount: amount ? formatUnits(amount, 18) : '0',
+    faucetAmountRaw: amount,
+    faucetCooldown: cooldown,
+    lastFaucetMint: lastMint,
+    isLoading,
+    refetch,
   }
 }
 

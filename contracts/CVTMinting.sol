@@ -26,6 +26,11 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
     // Mapping to track validator for each proof verification
     mapping(bytes32 => address) public proofValidators;
     
+    // Faucet
+    mapping(address => uint256) public lastFaucetMint;
+    uint256 public faucetAmount;
+    uint256 public faucetCooldown;
+
     // Events
     event CVTMinted(
         address indexed to,
@@ -35,6 +40,7 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
     );
     
     event ZKVerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
+    event FaucetClaimed(address indexed account, uint256 amount);
     
     /**
      * @dev Constructor
@@ -52,6 +58,8 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
         if (_validatorRewards != address(0)) {
             validatorRewards = ValidatorRewards(_validatorRewards);
         }
+        faucetAmount = 5 * 1e18;
+        faucetCooldown = 1 hours;
     }
     
     /**
@@ -74,6 +82,19 @@ contract CVTMinting is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
         address validator
     ) external nonReentrant {
         _mintCVT(to, amount, proof, publicInputs, commitment, projectId, validator);
+    }
+
+    function claimFaucet() external {
+        require(faucetAmount > 0, "Faucet disabled");
+        require(block.timestamp >= lastFaucetMint[msg.sender] + faucetCooldown, "Faucet cooldown");
+        lastFaucetMint[msg.sender] = block.timestamp;
+        _mint(msg.sender, faucetAmount);
+        emit FaucetClaimed(msg.sender, faucetAmount);
+    }
+
+    function setFaucetConfig(uint256 amountWei, uint256 cooldownSeconds) external onlyOwner {
+        faucetAmount = amountWei;
+        faucetCooldown = cooldownSeconds;
     }
     
     /**

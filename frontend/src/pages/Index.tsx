@@ -6,7 +6,9 @@ import { Wallet, TrendingUp, Lock, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { useDashboardData } from "@/hooks/useContractData";
+import { useFaucet } from "@/hooks/useFaucet";
 import { useAccount } from "wagmi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
@@ -46,6 +48,13 @@ const Index = () => {
 
   // Price hook
   const { price } = useCVTPrice();
+  const {
+    claim: claimFaucet,
+    canClaim: faucetAvailable,
+    isClaiming: isClaimingFaucet,
+    faucetAmount,
+    remainingCooldown,
+  } = useFaucet();
   const CVT_PRICE_USD = price.current;
 
   // Dialog states
@@ -130,6 +139,47 @@ const Index = () => {
             />
             <StatCard
               title="Pending Rewards"
+            <Card className="shadow-card lg:col-span-3">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>CVT Faucet</CardTitle>
+                    <CardDescription>
+                      Claim a small amount of CVT every hour to explore the platform.
+                    </CardDescription>
+                  </div>
+                  <Badge variant={faucetAvailable ? "success" : "secondary"}>
+                    {faucetAvailable ? "Ready" : "Cooldown"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-2xl font-bold text-foreground">
+                    {parseFloat(faucetAmount).toFixed(2)} CVT
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {faucetAvailable
+                      ? "Available now"
+                      : `Next claim in ${Math.ceil(remainingCooldown / 60)} min`}
+                  </p>
+                </div>
+                <Button
+                  className="gradient-primary"
+                  disabled={!isConnected || !faucetAvailable || isClaimingFaucet}
+                  onClick={async () => {
+                    try {
+                      await claimFaucet();
+                      setTimeout(() => refetch(), 2000);
+                    } catch {
+                      // handled in hook
+                    }
+                  }}
+                >
+                  {isClaimingFaucet ? "Claiming..." : "Claim 5 CVT"}
+                </Button>
+              </CardContent>
+            </Card>
               value={isLoading ? "..." : isConnected ? `${pendingRewards} CVT` : "0 CVT"}
               subtitle={isConnected ? `≈ $${(parseFloat(pendingRewards) * CVT_PRICE_USD).toFixed(2)} USD` : "Connect wallet to view"}
               icon={Award}

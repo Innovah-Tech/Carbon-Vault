@@ -2,12 +2,12 @@
   "network": "mantleSepolia",
   "chainId": 5003,
   "deployer": "0x7c538b83D0295f94C4bBAf8302095d9ED4b2Ad5f",
-  "timestamp": "2025-11-17T09:35:00.000Z",
+  "timestamp": "2025-11-17T09:50:00.000Z",
   "contracts": {
-    "CVTMinting": "0xA0ba6B90cB2F61e2aa8e55D1f40C49D91628a72A",
-    "CVTStaking": "0x2dcC36C96f7d1405507fa993513DbF56B11698eF",
-    "CVTMarketplace": "0x616Afef9723daE3Ce650233DF4cAa301F1D44212",
-    "ValidatorRewards": "0xB7E4423024103c253133541B9b1664114b781399",
-    "CarbonOffsetVerifier": "0xFB50bB31136FFAf59a2EDc06fb5A01814D1F70cE"
+    "CVTMinting": "0x6354888aAb631cDdc1599123458922bC6CE8fdfc",
+    "CVTStaking": "0xC0E76A94bA3762303cE86d4c30381BbA8Ce6D7d0",
+    "CVTMarketplace": "0x9237A02a8F823a47eEaC6b59fa469591036e2d3e",
+    "ValidatorRewards": "0x165Ac1b08F53a8cd6FA56F6260c987f68E9BfB74",
+    "CarbonOffsetVerifier": "0x6bB4e8E2B46386A910d58b8B9bcf40373e43D649"
   }
 }

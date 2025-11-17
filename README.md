@@ -263,6 +263,23 @@ pip install -r requirements.txt
 python run_pipeline.py
 ```
 
+### **Auto-Mint from Pipeline Output**
+# Faucet (Test CVT)
+
+Users can grab 5 CVT per hour directly from the dashboard faucet button. The feature calls `CVTMinting.claimFaucet()` behind the scenes (default amount and cooldown can be tuned by the contract owner). This helps new wallets try staking/marketplace flows without running the pipeline.
+
+After running the pipeline you can mint CVT directly from the generated measurements:
+
+```bash
+# Run pipeline + mint newest 2 records (dry-run first)
+HARDHAT_NETWORK=mantleSepolia node scripts/mint-from-pipeline.js --run-pipeline --limit 2 --dry-run
+
+# Execute for real
+HARDHAT_NETWORK=mantleSepolia node scripts/mint-from-pipeline.js --run-pipeline --limit 2
+```
+
+Options include `--min-co2`, `--file <custom_json>`, `--recipient`, `--validator`, and `--dry-run` for previews. The script reuses the proof generation helpers from `mint-cvt.js`, so each qualifying pipeline record becomes a mint transaction with matching project IDs and CO₂ amounts.
+
 ### **Configuration**
 
 Edit `data-pipeline/config.py`:

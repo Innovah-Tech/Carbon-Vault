@@ -1,9 +1,9 @@
 // Contract addresses (update after deployment)
 export const CONTRACT_ADDRESSES = {
-  CVTMinting: '0x037594a32Db6ae77ba09cAA6D5849B16b0F68807',
-  CVTStaking: '0x3f7EC1A0bd08196C67c2bD2A9b08C9A2c883abf9',
-  CVTMarketplace: '0x86925c66119e5F1F1A85EBb39FeEA2bC2F983013',
-  ValidatorRewards: '0x3A4eC2043BA30c5b9Ea48782a008c2125cD8962d',
+  CVTMinting: '0x6354888aAb631cDdc1599123458922bC6CE8fdfc',
+  CVTStaking: '0xC0E76A94bA3762303cE86d4c30381BbA8Ce6D7d0',
+  CVTMarketplace: '0x9237A02a8F823a47eEaC6b59fa469591036e2d3e',
+  ValidatorRewards: '0x165Ac1b08F53a8cd6FA56F6260c987f68E9BfB74',
 } as const
 
 // ERC20 ABI (for CVT token)
@@ -71,6 +71,37 @@ export const ERC20_ABI = [
     name: 'transfer',
     outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const
+
+export const CVT_MINTING_ABI = [
+  {
+    inputs: [],
+    name: 'claimFaucet',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: '', type: 'address' }],
+    name: 'lastFaucetMint',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'faucetAmount',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'faucetCooldown',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
     type: 'function',
   },
 ] as const
